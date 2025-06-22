@@ -4,12 +4,10 @@ from event_bridge import handle_notion_event
 
 app = FastAPI()
 
-# ✅ Step 1: Define a request body model
-class NotionEvent(BaseModel):
+class EventInput(BaseModel):
     event: str
 
-# ✅ Step 2: Use the model in your endpoint
 @app.post("/notion-event")
-async def receive_event(payload: NotionEvent):
-    parsed = handle_notion_event(payload.event)
-    return parsed
+async def receive_event(event_input: EventInput):
+    result = handle_notion_event(event_input.event)
+    return result

@@ -1,41 +1,31 @@
-# event_bridge.py
-
 import dateparser
 import re
+from datetime import datetime
 
-def extract_datetime(text):
-    dt = dateparser.parse(text)
-    if dt:
-        date = dt.date().isoformat()
-        time = dt.time().strftime("%H:%M") if dt.time() else ""
-        return date, time
-    return "Unrecognized", ""
+def handle_notion_event(event_text: str) -> dict:
+    # Extract datetime from natural text
+    dt = dateparser.parse(event_text, settings={"PREFER_DATES_FROM": "future"})
+    
+    if not dt:
+        return {
+            "status": "error",
+            "message": "Could not parse date or time"
+        }
 
-def extract_location(text):
-    # Naive rule-based location extraction (you can replace this with spaCy for better results)
-    match = re.search(r"in ([A-Za-z\s]+)", text)
-    return match.group(1).strip() if match else ""
+    # Try to find location (basic: last capitalized word group)
+    location_match = re.search(r"in ([A-Z][a-zA-Z\s]+)", event_text)
+    location = location_match.group(1).strip() if location_match else "Unknown"
 
-def extract_title(text):
-    # Try to extract the purpose (e.g., "doctor's appointment", "wedding", "exam")
-    key_phrases = ['meeting', 'appointment', 'exam', 'class', 'lecture', 'party', 'wedding', 'birthday']
-    for phrase in key_phrases:
-        if phrase in text.lower():
-            return ' '.join([word.capitalize() for word in text.split() if phrase in word.lower()])
-    return text.split("at")[-1].strip().capitalize()
-
-def handle_notion_event(payload):
-    raw_text = payload.get("event", "")
-    date, time = extract_datetime(raw_text)
-    location = extract_location(raw_text)
-    title = extract_title(raw_text)
+    # Try to extract a meaningful title
+    title_match = re.search(r"(?:have|got|need|going)\s+to\s+(.*?)\s+(?:in|at|on|by|$)", event_text)
+    title = title_match.group(1).strip().capitalize() if title_match else event_text[:30]
 
     return {
         "status": "received",
         "title": title,
-        "date": date,
-        "time": time,
+        "date": dt.strftime("%Y-%m-%d"),
+        "time": dt.strftime("%H:%M"),
         "location": location,
-        "description": raw_text,
-        "category": "general"
+        "description": event_text,
+        "category": "personal"
     }

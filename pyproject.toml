@@ -1,7 +1,13 @@
 [project]
-name = "python-template"
+name = "notion-calendar-bot"
 version = "0.1.0"
 description = ""
 authors = ["Your Name <you@example.com>"]
 requires-python = ">=3.11"
-dependencies = []
+
+dependencies = [
+  "flask>=3.1.1",
+  "requests>=2.32.4",
+  "python-dotenv",
+  "dateparser"
+]

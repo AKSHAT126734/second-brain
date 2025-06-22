@@ -1,5 +1,6 @@
-from fastapi import FastAPI
-from pydantic import BaseModel
+# main.py
+
+from fastapi import FastAPI, Request
 from event_bridge import handle_notion_event
 
 app = FastAPI()
@@ -8,9 +9,7 @@ app = FastAPI()
 def read_root():
     return {"message": "Hello from Render-hosted app!"}
 
-class EventRequest(BaseModel):
-    event: str
-
 @app.post("/notion-event")
-def receive_event(payload: EventRequest):
-    return handle_notion_event({"message": payload.event})
+async def receive_event(request: Request):
+    payload = await request.json()
+    return handle_notion_event(payload)

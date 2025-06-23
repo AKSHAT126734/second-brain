@@ -1,31 +1,33 @@
+# event_bridge.py
+
+from typing import Optional
 import dateparser
 import re
-from datetime import datetime
 
-def handle_notion_event(event_text: str) -> dict:
-    # Extract datetime from natural text
-    dt = dateparser.parse(event_text, settings={"PREFER_DATES_FROM": "future"})
-    
-    if not dt:
-        return {
-            "status": "error",
-            "message": "Could not parse date or time"
-        }
-
-    # Try to find location (basic: last capitalized word group)
-    location_match = re.search(r"in ([A-Z][a-zA-Z\s]+)", event_text)
-    location = location_match.group(1).strip() if location_match else "Unknown"
-
-    # Try to extract a meaningful title
-    title_match = re.search(r"(?:have|got|need|going)\s+to\s+(.*?)\s+(?:in|at|on|by|$)", event_text)
-    title = title_match.group(1).strip().capitalize() if title_match else event_text[:30]
-
-    return {
-        "status": "received",
-        "title": title,
-        "date": dt.strftime("%Y-%m-%d"),
-        "time": dt.strftime("%H:%M"),
-        "location": location,
-        "description": event_text,
-        "category": "personal"
+def extract_event_details(text: str) -> dict:
+    result = {
+        "title": text.strip(),
+        "date": None,
+        "time": None,
+        "location": None,
+        "description": text.strip(),
+        "category": "general"
     }
+
+    # Extract datetime
+    dt = dateparser.parse(text, settings={"PREFER_DATES_FROM": "future"})
+    if dt:
+        result["date"] = dt.strftime("%Y-%m-%d")
+        result["time"] = dt.strftime("%H:%M")
+
+    # Extract location (very basic — after keywords like 'at', 'in', etc.)
+    location_match = re.search(r'\b(?:at|in|to)\s+([A-Z][\w\s]+)', text)
+    if location_match:
+        result["location"] = location_match.group(1).strip()
+
+    # Attempt to extract cleaner title
+    title_match = re.search(r'(?:I have|there is|attend)\s+(.*?)\s+(?:at|in|on|by|tomorrow|today|next|this|at\s+\d)', text, re.IGNORECASE)
+    if title_match:
+        result["title"] = title_match.group(1).strip().capitalize()
+
+    return result

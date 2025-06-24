@@ -1,47 +1,72 @@
-from fastapi import HTTPException
-from pydantic import BaseModel
-from typing import Optional
-import openai
-
-# Load your OpenAI API key (you must set this in Render as an environment variable)
 import os
+import openai
+from dotenv import load_dotenv
+from notion_client import Client
+from datetime import datetime
+
+load_dotenv()
+
 openai.api_key = os.getenv("OPENAI_API_KEY")
+notion = Client(auth=os.getenv("NOTION_API_KEY"))
+DATABASE_ID = os.getenv("NOTION_DATABASE_ID")
 
+def extract_event_info_from_text(user_input: str) -> dict:
+    prompt = f"""
+You are a helpful assistant that extracts calendar event data from user input.
 
-class EventRequest(BaseModel):
-    event: str
+Extract the following fields:
+- title
+- date
+- start_time (24h format, IST)
+- end_time (if available, otherwise null)
+- location (if available)
+- description (if available)
 
+User Input: "{user_input}"
 
-def chatgpt_parse_event(user_input: str) -> dict:
-    system_prompt = """
-You are a calendar assistant. Extract structured information from user messages.
-Return a JSON object with the following fields:
-
-- title: A short title for the event
-- date: The date of the event in YYYY-MM-DD format
-- time: The start time in 24-hour format (e.g., 16:00)
-- location: The place of the event
-- description: Full user input
-- category: general, personal, health, work, etc. Choose best fit
-
-If any field is missing or unknown, leave it as an empty string.
+Respond in JSON format:
+{{
+  "title": ...,
+  "date": ...,
+  "start_time": ...,
+  "end_time": ...,
+  "location": ...,
+  "description": ...
+}}
 """
+
     response = openai.ChatCompletion.create(
         model="gpt-4",
-        messages=[
-            {"role": "system", "content": system_prompt.strip()},
-            {"role": "user", "content": user_input.strip()},
-        ],
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0
     )
 
-    try:
-        parsed_json = response['choices'][0]['message']['content']
-        return eval(parsed_json)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Parsing error: {str(e)}")
+    json_text = response["choices"][0]["message"]["content"]
+    return eval(json_text)  # assumes model returns clean JSON dict
 
+def handle_notion_event(user_input: str):
+    event = extract_event_info_from_text(user_input)
 
-def handle_notion_event(request: EventRequest):
-    result = chatgpt_parse_event(request.event)
-    result['status'] = "received"
-    return result
+    notion.pages.create(
+        parent={"database_id": DATABASE_ID},
+        properties={
+            "Name": {"title": [{"text": {"content": event["title"]}}]},
+            "Date": {"date": {"start": f"{event['date']}T{event['start_time']}+05:30"}},
+        },
+        children=[
+            {
+                "object": "block",
+                "type": "paragraph",
+                "paragraph": {
+                    "rich_text": [{"text": {"content": f"Location: {event.get('location', '')}"}}],
+                },
+            },
+            {
+                "object": "block",
+                "type": "paragraph",
+                "paragraph": {
+                    "rich_text": [{"text": {"content": f"Description: {event.get('description', '')}"}}],
+                },
+            }
+        ]
+    )

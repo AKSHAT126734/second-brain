@@ -1,35 +1,67 @@
-# 🛠️ Triggering redeploy: Minor comment added
-
-from notion_client import Client
-from datetime import datetime
-import dateparser
 import os
+from datetime import datetime
+from dotenv import load_dotenv
+from notion_client import Client
+import dateparser
 
-def extract_event_details(user_input: str):
-    dt = dateparser.parse(user_input, settings={"PREFER_DATES_FROM": "future"})
+load_dotenv()
+
+def parse_event(input_text: str) -> dict:
+    print("\n🧠 Parsing user input:", input_text)
+
+    # Extract datetime
+    dt = dateparser.parse(input_text, settings={'PREFER_DATES_FROM': 'future'})
     if not dt:
-        return None
+        raise ValueError("Could not parse datetime from input")
 
-    return {
-        "title": user_input.split(" at ")[0].strip().capitalize(),
-        "datetime": dt.strftime("%Y-%m-%dT%H:%M:%S"),
-        "location": user_input.split(" at ")[-1].strip().capitalize() if " at " in user_input else "",
+    # Very basic logic to extract title and location
+    title = "Untitled Event"
+    location = ""
+
+    lower_text = input_text.lower()
+    if " at " in lower_text:
+        parts = input_text.split(" at ")
+        if len(parts) >= 2:
+            title = parts[0].strip().capitalize()
+            location = "at " + parts[1].strip().capitalize()
+        else:
+            title = input_text.strip().capitalize()
+    else:
+        title = input_text.strip().capitalize()
+
+    event = {
+        "title": title,
+        "datetime": dt,
+        "location": location
     }
 
+    print("🧾 Parsed event details:", event)
+    return event
+
+def send_to_notion(event: dict):
+    print("\n📤 Attempting to send to Notion...")
+    print("📝 Payload to Notion:", event)
+
+    try:
+        notion = Client(auth=os.getenv("NOTION_API_KEY"))
+        response = notion.pages.create(
+            parent={"database_id": os.getenv("NOTION_CALENDAR_DB_ID")},
+            properties={
+                "Name": {"title": [{"text": {"content": event['title']}}]},
+                "Date": {"date": {"start": event['datetime'].isoformat()}},
+                "Location": {"rich_text": [{"text": {"content": event.get('location', '')}}]},
+            },
+        )
+        print("✅ Notion response:")
+        print(response)
+    except Exception as e:
+        print("❌ Failed to send to Notion.")
+        print("Error:", e)
+
 def handle_notion_event(user_input: str):
-    notion = Client(auth=os.getenv("NOTION_API_KEY"))
-    database_id = os.getenv("NOTION_DATABASE_ID")
-    event = extract_event_details(user_input)
-
-    if not event:
-        return {"error": "Could not parse date or event details."}
-
-    notion.pages.create(
-        parent={"database_id": database_id},
-        properties={
-            "Name": {"title": [{"text": {"content": event["title"]}}]},
-            "Date": {"date": {"start": event["datetime"]}},
-            "Location": {"rich_text": [{"text": {"content": event["location"]}}]},
-        }
-    )
-    return {"message": "Event added to Notion calendar!"}
+    try:
+        event = parse_event(user_input)
+        send_to_notion(event)
+    except Exception as e:
+        print("❌ Error in handle_notion_event:")
+        print(e)

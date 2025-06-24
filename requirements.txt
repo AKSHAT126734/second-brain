@@ -3,3 +3,4 @@ uvicorn
 dateparser
 openai
 python-dotenv
+notion-client

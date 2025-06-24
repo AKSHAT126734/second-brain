@@ -1,13 +1,9 @@
-from fastapi import FastAPI
-from pydantic import BaseModel
+from fastapi import FastAPI, Request
 from event_bridge import handle_notion_event
 
 app = FastAPI()
 
-class EventInput(BaseModel):
-    event: str
-
-@app.post("/notion-event")
-async def receive_event(event_input: EventInput):
-    result = handle_notion_event(event_input.event)
-    return result
+@app.post("/chatgpt-calendar")
+async def chatgpt_calendar(request: Request):
+    data = await request.json()
+    return await handle_notion_event(data)

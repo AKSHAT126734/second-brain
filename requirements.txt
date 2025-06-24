@@ -2,3 +2,4 @@ fastapi
 uvicorn
 dateparser
 openai
+python-dotenv

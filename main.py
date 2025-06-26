@@ -1,9 +1,13 @@
 from fastapi import FastAPI, Request
-from event_bridge import handle_notion_event
+from event_bridge import process_event
 
 app = FastAPI()
 
-@app.post("/chatgpt-calendar")
-async def chatgpt_calendar(request: Request):
+@app.get("/")
+def read_root():
+    return {"message": "✅ Notion Sync API is running!"}
+
+@app.post("/add-event")
+async def add_event(request: Request):
     data = await request.json()
-    return await handle_notion_event(data)
+    return process_event(data)

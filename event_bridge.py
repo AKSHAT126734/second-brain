@@ -10,7 +10,10 @@ notion = Client(auth=os.getenv("NOTION_API_KEY"))
 database_id = os.getenv("NOTION_DATABASE_ID")
 
 def extract_event_details(message: str):
-    parsed_date = dateparser.parse(message, settings={"PREFER_DATES_FROM": "future"})
+    parsed_date = dateparser.parse(
+        message,
+        settings={"PREFER_DATES_FROM": "future"}
+    )
     if not parsed_date:
         raise ValueError("Could not parse a date from the input.")
 

@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Request
-from event_bridge import process_event
+from event_bridge import extract_event_details
 
 app = FastAPI()
 
@@ -9,5 +9,11 @@ def read_root():
 
 @app.post("/add-event")
 async def add_event(request: Request):
-    data = await request.json()
-    return process_event(data)
+    payload = await request.json()
+    message = payload.get("message") if isinstance(payload, dict) else str(payload)
+    
+    result = extract_event_details(message)
+    return {
+        "status": "success",
+        "parsed_event": result
+    }
